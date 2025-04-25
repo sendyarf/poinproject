@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Telegram Mini App - Poin Reward</title>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 flex items-center justify-center h-screen">
+  <div class="bg-white p-6 rounded-lg shadow-lg w-full max-w-md">
+    <h1 class="text-2xl font-bold mb-4 text-center">Aplikasi Poin Reward</h1>
+    <div id="user-info" class="mb-4 text-center"></div>
+    <div id="points-display" class="text-lg font-semibold mb-4 text-center">Poin: 0</div>
+    <button id="watch-ad" class="w-full bg-blue-500 text-white py-2 rounded hover:bg-blue-600">Tonton Iklan (+1 Poin)</button>
+    <button id="sync-points" class="w-full bg-green-500 text-white py-2 rounded hover:bg-green-600 mt-2">Sinkronkan Poin</button>
+    <div id="message" class="mt-4 text-center text-red-500"></div>
+  </div>
+
+  <script>
+    // Telegram Web App
+    const tg = window.Telegram.WebApp;
+    tg.ready();
+    tg.expand();
+
+    // Ambil data pengguna Telegram
+    const user = tg.initDataUnsafe.user;
+    if (user) {
+      document.getElementById('user-info').innerText = `Selamat datang, ${user.first_name}!`;
+      loadMonetagScript();
+      loadLocalPoints(user.id);
+    } else {
+      document.getElementById('message').innerText = 'Buka aplikasi ini dari Telegram.';
+    }
+
+    // Muat skrip Monetag secara dinamis
+    function loadMonetagScript() {
+      if (window.show_9244919) return;
+      const tag = document.createElement('script');
+      tag.src = '//whephiwums.com/sdk.js';
+      tag.dataset.zone = '9244919';
+      tag.dataset.sdk = 'show_9244919';
+      document.body.appendChild(tag);
+    }
+
+    // Muat poin dari localStorage
+    function loadLocalPoints(telegramId) {
+      const userData = JSON.parse(localStorage.getItem(`user_${telegramId}`)) || { telegramId, points: 0 };
+      document.getElementById('points-display').innerText = `Poin: ${userData.points}`;
+      return userData;
+    }
+
+    // Simpan poin ke localStorage
+    function saveLocalPoints(telegramId, points) {
+      const userData = { telegramId, points };
+      localStorage.setItem(`user_${telegramId}`, JSON.stringify(userData));
+      document.getElementById('points-display').innerText = `Poin: ${points}`;
+    }
+
+    // Sinkronkan poin dari channel
+    async function syncPoints(telegramId) {
+      try {
+        const response = await fetch('/.netlify/functions/getUserPoints', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ telegramId })
+        });
+        const data = await response.json();
+        if (data.error) {
+          throw new Error(data.error);
+        }
+        const cloudPoints = data.points || 0;
+        const localData = loadLocalPoints(telegramId);
+        const localPoints = localData.points;
+
+        // Gunakan poin tertinggi
+        const maxPoints = Math.max(localPoints, cloudPoints);
+        if (maxPoints > localPoints) {
+          saveLocalPoints(telegramId, maxPoints);
+        }
+        if (maxPoints > cloudPoints) {
+          await updateCloudPoints(telegramId, maxPoints);
+        }
+        document.getElementById('message').innerText = 'Poin disinkronkan!';
+      } catch (error) {
+        document.getElementById('message').innerText = `Error: ${error.message}`;
+      }
+    }
+
+    // Update poin ke channel
+    async function updateCloudPoints(telegramId, points) {
+      try {
+        const response = await fetch('/.netlify/functions/updatePoints', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ telegramId, points })
+        });
+        const data = await response.json();
+        if (data.error) {
+          throw new Error(data.error);
+        }
+      } catch (error) {
+        throw new Error(`Gagal menyinkronkan ke cloud: ${error.message}`);
+      }
+    }
+
+    // Tombol tonton iklan
+    document.getElementById('watch-ad').addEventListener('click', async () => {
+      try {
+        // Validasi aksi menonton iklan
+        const response = await fetch('/.netlify/functions/validateAdWatch', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ telegramId: user.id })
+        });
+        const data = await response.json();
+        if (data.error) {
+          throw new Error(data.error);
+        }
+
+        // Tampilkan iklan Monetag
+        if (window.show_9244919) {
+          show_9244919().then(() => {
+            // Tambah poin setelah iklan selesai
+            const localData = loadLocalPoints(user.id);
+            const newPoints = localData.points + 1;
+            saveLocalPoints(user.id, newPoints);
+            updateCloudPoints(user.id, newPoints);
+            document.getElementById('message').innerText = 'Iklan ditonton! +1 Poin';
+          }).catch((error) => {
+            document.getElementById('message').innerText = 'Gagal menampilkan iklan.';
+          });
+        } else {
+          document.getElementById('message').innerText = 'Skrip iklan belum dimuat. Coba lagi.';
+        }
+      } catch (error) {
+        document.getElementById('message').innerText = `Error: ${error.message}`;
+      }
+    });
+
+    // Tombol sinkronkan poin
+    document.getElementById('sync-points').addEventListener('click', () => {
+      syncPoints(user.id);
+    });
+  </script>
+</body>
+</html>
