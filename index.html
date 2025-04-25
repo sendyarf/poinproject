@@ -85,40 +85,47 @@
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ telegramId, points })
         });
+
         if (!response.ok) {
           const errorText = await response.text();
           console.error(`Gagal memanggil /updatePoints: Status ${response.status}, ${errorText}`);
           throw new Error(`Request failed with status code ${response.status}: ${errorText}`);
         }
+
         const data = await response.json();
         if (data.error) {
           throw new Error(data.error);
         }
+
         console.log('Cloud diperbarui:', data);
+        return data;
       } catch (error) {
         console.error('Error saat update cloud:', error);
         throw error;
       }
     }
 
-    // Tombol tonton iklan
-    document.getElementById('watch-ad').addEventListener('click', async () => {
+    async function watchAd() {
       try {
         console.log('Tombol Tonton Iklan diklik');
+        
         // Validasi aksi menonton iklan
         const validateResponse = await fetch('/.netlify/functions/validateAdWatch', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ telegramId: user.id })
         });
+
         if (!validateResponse.ok) {
           const errorText = await validateResponse.text();
           throw new Error(`Validasi gagal dengan status ${validateResponse.status}: ${errorText}`);
         }
+
         const validateData = await validateResponse.json();
         if (validateData.error) {
           throw new Error(validateData.error);
         }
+
         console.log('Validasi iklan berhasil');
 
         // Tampilkan iklan Monetag
@@ -137,20 +144,27 @@
           // Tambah poin setelah iklan selesai
           const localData = loadLocalPoints(user.id);
           const newPoints = localData.points + 1;
+          
           // Simpan ke localStorage terlebih dahulu
           saveLocalPoints(user.id, newPoints);
+          
           // Kemudian update ke cloud
           await updateCloudPoints(user.id, newPoints);
+          
           document.getElementById('message').innerText = 'Iklan ditonton! +1 Poin';
-        } else {
-          console.error('Skrip Monetag belum dimuat');
-          document.getElementById('message').innerText = 'Skrip iklan belum dimuat. Coba lagi.';
+          return;
         }
+
+        console.error('Skrip Monetag belum dimuat');
+        throw new Error('Skrip iklan belum dimuat. Coba lagi.');
+
       } catch (error) {
         console.error('Error saat tonton iklan:', error);
         document.getElementById('message').innerText = `Error: ${error.message}`;
       }
-    });
+    }
+
+    document.getElementById('watch-ad').addEventListener('click', watchAd);
   </script>
 </body>
 </html>

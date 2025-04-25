@@ -1,4 +1,13 @@
 [build]
   command = "echo 'No build required'"
   publish = "."
-  functions = "netlify/functions"
+
+[build.environment]
+  TELEGRAM_BOT_TOKEN = "7380366315:AAH9dnuF50OpUDjGIy06bLioyEa9Fr4bfS8"
+  CHANNEL_ID = "-1002697590626"
+
+[functions]
+  node_bundler = "esbuild"
+  node_version = "18"
+  memory_size = "1024"
+  timeout = "10"

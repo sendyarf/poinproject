@@ -2,7 +2,7 @@ const axios = require('axios');
 
 exports.handler = async (event) => {
   const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
-  const CHANNEL_ID = '-1002697590626';
+  const CHANNEL_ID = process.env.CHANNEL_ID; // Gunakan env variable untuk channel ID
 
   try {
     console.log('Menerima event:', event);
@@ -21,7 +21,9 @@ exports.handler = async (event) => {
     // Kirim pesan baru ke channel
     const response = await axios.post(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
       chat_id: CHANNEL_ID,
-      text: messageText
+      text: messageText,
+      parse_mode: 'Markdown',
+      disable_notification: true // Tidak mengirim notifikasi
     });
 
     console.log('Pesan dikirim:', response.data);
@@ -32,9 +34,18 @@ exports.handler = async (event) => {
     };
   } catch (error) {
     console.error('Error di updatePoints:', error.message, error.response ? error.response.data : '');
+    
+    // Jika error 403 (Forbidden), coba autentikasi ulang
+    if (error.response && error.response.status === 403) {
+      console.error('Akses ke channel ditolak. Pastikan bot sudah ditambahkan ke channel dan memiliki izin yang diperlukan.');
+    }
+
     return {
-      statusCode: 500,
-      body: JSON.stringify({ error: error.message })
+      statusCode: error.response ? error.response.status : 500,
+      body: JSON.stringify({ 
+        error: error.message,
+        details: error.response ? error.response.data : undefined
+      })
     };
   }
 };
