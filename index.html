@@ -13,7 +13,6 @@
     <div id="user-info" class="mb-4 text-center"></div>
     <div id="points-display" class="text-lg font-semibold mb-4 text-center">Poin: 0</div>
     <button id="watch-ad" class="w-full bg-blue-500 text-white py-2 rounded hover:bg-blue-600">Tonton Iklan (+1 Poin)</button>
-    <button id="sync-points" class="w-full bg-green-500 text-white py-2 rounded hover:bg-green-600 mt-2">Sinkronkan Poin</button>
     <div id="message" class="mt-4 text-center text-red-500"></div>
   </div>
 
@@ -26,95 +25,71 @@
     // Ambil data pengguna Telegram
     const user = tg.initDataUnsafe.user;
     if (user) {
+      console.log('Pengguna terdeteksi:', user);
       document.getElementById('user-info').innerText = `Selamat datang, ${user.first_name}!`;
       loadMonetagScript();
       loadLocalPoints(user.id);
     } else {
+      console.error('Tidak ada data pengguna Telegram');
       document.getElementById('message').innerText = 'Buka aplikasi ini dari Telegram.';
     }
 
     // Muat skrip Monetag secara dinamis
     function loadMonetagScript() {
-      if (window.show_9244919) return;
+      if (window.show_9244919) {
+        console.log('Skrip Monetag sudah dimuat');
+        return;
+      }
+      console.log('Memuat skrip Monetag');
       const tag = document.createElement('script');
       tag.src = '//whephiwums.com/sdk.js';
       tag.dataset.zone = '9244919';
       tag.dataset.sdk = 'show_9244919';
+      tag.onload = () => console.log('Skrip Monetag dimuat');
+      tag.onerror = () => console.error('Gagal memuat skrip Monetag');
       document.body.appendChild(tag);
     }
 
     // Muat poin dari localStorage
     function loadLocalPoints(telegramId) {
-      const userData = JSON.parse(localStorage.getItem(`user_${telegramId}`)) || { telegramId, points: 0, messageId: null };
+      const userData = JSON.parse(localStorage.getItem(`user_${telegramId}`)) || { telegramId, points: 0 };
+      console.log('Poin dimuat dari localStorage:', userData);
       document.getElementById('points-display').innerText = `Poin: ${userData.points}`;
       return userData;
     }
 
     // Simpan poin ke localStorage
-    function saveLocalPoints(telegramId, points, messageId) {
-      const userData = { telegramId, points, messageId };
+    function saveLocalPoints(telegramId, points) {
+      const userData = { telegramId, points };
       localStorage.setItem(`user_${telegramId}`, JSON.stringify(userData));
+      console.log('Poin disimpan ke localStorage:', userData);
       document.getElementById('points-display').innerText = `Poin: ${points}`;
     }
 
-    // Sinkronkan poin dari channel
-    async function syncPoints(telegramId) {
-      try {
-        const localData = loadLocalPoints(telegramId);
-        console.log(`Sinkronisasi untuk telegramId: ${telegramId}, localPoints: ${localData.points}, messageId: ${localData.messageId}`);
-        const response = await fetch('/.netlify/functions/getUserPoints', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ telegramId, messageId: localData.messageId })
-        });
-        const data = await response.json();
-        if (data.error) {
-          throw new Error(data.error);
-        }
-        const cloudPoints = data.points || 0;
-        const localPoints = localData.points;
-
-        console.log(`cloudPoints: ${cloudPoints}, localPoints: ${localPoints}`);
-        // Gunakan poin tertinggi
-        const maxPoints = Math.max(localPoints, cloudPoints);
-        if (maxPoints > localPoints) {
-          saveLocalPoints(telegramId, maxPoints, localData.messageId);
-        }
-        if (maxPoints > cloudPoints) {
-          await updateCloudPoints(telegramId, maxPoints, localData.messageId);
-        }
-        document.getElementById('message').innerText = 'Poin disinkronkan!';
-      } catch (error) {
-        console.error('Error saat sinkronisasi:', error);
-        document.getElementById('message').innerText = `Error: ${error.message}`;
-      }
-    }
-
     // Update poin ke channel
-    async function updateCloudPoints(telegramId, points, messageId) {
+    async function updateCloudPoints(telegramId, points) {
       try {
-        console.log(`Mengirim ke cloud: telegramId: ${telegramId}, points: ${points}, messageId: ${messageId}`);
+        console.log(`Mengirim ke cloud: telegramId: ${telegramId}, points: ${points}`);
         const response = await fetch('/.netlify/functions/updatePoints', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ telegramId, points, messageId })
+          body: JSON.stringify({ telegramId, points })
         });
         const data = await response.json();
         if (data.error) {
           throw new Error(data.error);
         }
-        console.log(`Cloud diperbarui: points: ${data.points}, messageId: ${data.messageId}`);
-        // Simpan messageId baru ke localStorage
-        saveLocalPoints(telegramId, points, data.messageId);
+        console.log('Cloud diperbarui:', data);
       } catch (error) {
         console.error('Error saat update cloud:', error);
-        throw new Error(`Gagal menyinkronkan ke cloud: ${error.message}`);
+        document.getElementById('message').innerText = `Gagal menyinkronkan ke cloud: ${error.message}`;
       }
     }
 
     // Tombol tonton iklan
     document.getElementById('watch-ad').addEventListener('click', async () => {
       try {
+        console.log('Tombol Tonton Iklan diklik');
         // Validasi aksi menonton iklan
         const response = await fetch('/.netlify/functions/validateAdWatch', {
           method: 'POST',
@@ -125,6 +100,7 @@
         if (data.error) {
           throw new Error(data.error);
         }
+        console.log('Validasi iklan berhasil');
 
         // Tampilkan iklan Monetag
         if (window.show_9244919) {
@@ -134,7 +110,10 @@
             // Tambah poin setelah iklan selesai
             const localData = loadLocalPoints(user.id);
             const newPoints = localData.points + 1;
-            updateCloudPoints(user.id, newPoints, localData.messageId);
+            // Simpan ke localStorage terlebih dahulu
+            saveLocalPoints(user.id, newPoints);
+            // Kemudian update ke cloud
+            updateCloudPoints(user.id, newPoints);
             document.getElementById('message').innerText = 'Iklan ditonton! +1 Poin';
           }).catch((error) => {
             console.error('Error iklan:', error);
@@ -148,11 +127,6 @@
         console.error('Error saat tonton iklan:', error);
         document.getElementById('message').innerText = `Error: ${error.message}`;
       }
-    });
-
-    // Tombol sinkronkan poin
-    document.getElementById('sync-points').addEventListener('click', () => {
-      syncPoints(user.id);
     });
   </script>
 </body>

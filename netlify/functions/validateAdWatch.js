@@ -1,7 +1,11 @@
 exports.handler = async (event) => {
     try {
       const { telegramId } = JSON.parse(event.body);
-      // Tambahkan rate-limiting jika diperlukan
+      if (!telegramId) {
+        console.error('Validasi gagal: telegramId tidak ada');
+        throw new Error('telegramId diperlukan');
+      }
+      console.log(`Validasi iklan untuk telegramId: ${telegramId}`);
       return {
         statusCode: 200,
         body: JSON.stringify({ success: true })
