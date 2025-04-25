@@ -52,18 +52,28 @@
 
     // Muat poin dari localStorage
     function loadLocalPoints(telegramId) {
-      const userData = JSON.parse(localStorage.getItem(`user_${telegramId}`)) || { telegramId, points: 0 };
-      console.log('Poin dimuat dari localStorage:', userData);
-      document.getElementById('points-display').innerText = `Poin: ${userData.points}`;
-      return userData;
+      try {
+        const userData = JSON.parse(localStorage.getItem(`user_${telegramId}`)) || { telegramId, points: 0 };
+        console.log('Poin dimuat dari localStorage:', userData);
+        document.getElementById('points-display').innerText = `Poin: ${userData.points}`;
+        return userData;
+      } catch (error) {
+        console.error('Error saat memuat localStorage:', error);
+        return { telegramId, points: 0 };
+      }
     }
 
     // Simpan poin ke localStorage
     function saveLocalPoints(telegramId, points) {
-      const userData = { telegramId, points };
-      localStorage.setItem(`user_${telegramId}`, JSON.stringify(userData));
-      console.log('Poin disimpan ke localStorage:', userData);
-      document.getElementById('points-display').innerText = `Poin: ${points}`;
+      try {
+        const userData = { telegramId, points };
+        localStorage.setItem(`user_${telegramId}`, JSON.stringify(userData));
+        console.log('Poin disimpan ke localStorage:', userData);
+        document.getElementById('points-display').innerText = `Poin: ${userData.points}`;
+      } catch (error) {
+        console.error('Error saat menyimpan ke localStorage:', error);
+        document.getElementById('message').innerText = 'Gagal menyimpan poin ke localStorage.';
+      }
     }
 
     // Update poin ke channel
@@ -75,6 +85,11 @@
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ telegramId, points })
         });
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error(`Gagal memanggil /updatePoints: Status ${response.status}, ${errorText}`);
+          throw new Error(`Request failed with status code ${response.status}: ${errorText}`);
+        }
         const data = await response.json();
         if (data.error) {
           throw new Error(data.error);
@@ -82,7 +97,7 @@
         console.log('Cloud diperbarui:', data);
       } catch (error) {
         console.error('Error saat update cloud:', error);
-        document.getElementById('message').innerText = `Gagal menyinkronkan ke cloud: ${error.message}`;
+        throw error;
       }
     }
 
@@ -91,34 +106,42 @@
       try {
         console.log('Tombol Tonton Iklan diklik');
         // Validasi aksi menonton iklan
-        const response = await fetch('/.netlify/functions/validateAdWatch', {
+        const validateResponse = await fetch('/.netlify/functions/validateAdWatch', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ telegramId: user.id })
         });
-        const data = await response.json();
-        if (data.error) {
-          throw new Error(data.error);
+        if (!validateResponse.ok) {
+          const errorText = await validateResponse.text();
+          throw new Error(`Validasi gagal dengan status ${validateResponse.status}: ${errorText}`);
+        }
+        const validateData = await validateResponse.json();
+        if (validateData.error) {
+          throw new Error(validateData.error);
         }
         console.log('Validasi iklan berhasil');
 
         // Tampilkan iklan Monetag
         if (window.show_9244919) {
           console.log('Memulai iklan Monetag');
-          show_9244919().then(() => {
-            console.log('Iklan selesai');
-            // Tambah poin setelah iklan selesai
-            const localData = loadLocalPoints(user.id);
-            const newPoints = localData.points + 1;
-            // Simpan ke localStorage terlebih dahulu
-            saveLocalPoints(user.id, newPoints);
-            // Kemudian update ke cloud
-            updateCloudPoints(user.id, newPoints);
-            document.getElementById('message').innerText = 'Iklan ditonton! +1 Poin';
-          }).catch((error) => {
-            console.error('Error iklan:', error);
-            document.getElementById('message').innerText = 'Gagal menampilkan iklan.';
+          await new Promise((resolve, reject) => {
+            show_9244919().then(() => {
+              console.log('Iklan selesai');
+              resolve();
+            }).catch((error) => {
+              console.error('Error iklan:', error);
+              reject(new Error('Gagal menampilkan iklan.'));
+            });
           });
+
+          // Tambah poin setelah iklan selesai
+          const localData = loadLocalPoints(user.id);
+          const newPoints = localData.points + 1;
+          // Simpan ke localStorage terlebih dahulu
+          saveLocalPoints(user.id, newPoints);
+          // Kemudian update ke cloud
+          await updateCloudPoints(user.id, newPoints);
+          document.getElementById('message').innerText = 'Iklan ditonton! +1 Poin';
         } else {
           console.error('Skrip Monetag belum dimuat');
           document.getElementById('message').innerText = 'Skrip iklan belum dimuat. Coba lagi.';

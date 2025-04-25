@@ -1,5 +1,6 @@
 exports.handler = async (event) => {
     try {
+      console.log('Menerima event untuk validateAdWatch:', event);
       const { telegramId } = JSON.parse(event.body);
       if (!telegramId) {
         console.error('Validasi gagal: telegramId tidak ada');

@@ -5,11 +5,12 @@ exports.handler = async (event) => {
   const CHANNEL_ID = '-1002697590626';
 
   try {
+    console.log('Menerima event:', event);
     const { telegramId, points } = JSON.parse(event.body);
 
     // Validasi input
     if (!telegramId || points === undefined) {
-      console.error('Validasi gagal: telegramId atau points tidak ada');
+      console.error('Validasi gagal: telegramId atau points tidak ada', { telegramId, points });
       throw new Error('telegramId dan points diperlukan');
     }
 
