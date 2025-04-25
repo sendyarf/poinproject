@@ -1,6 +1,6 @@
 const axios = require('axios');
 
-exports.handler = async (event) => {
+exports.handler = async (event, context) => {
   const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
   const CHANNEL_ID = process.env.CHANNEL_ID; // Gunakan env variable untuk channel ID
 

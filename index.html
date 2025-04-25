@@ -82,7 +82,10 @@
         console.log(`Mengirim ke cloud: telegramId: ${telegramId}, points: ${points}`);
         const response = await fetch('/.netlify/functions/updatePoints', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+          },
           body: JSON.stringify({ telegramId, points })
         });
 
@@ -112,7 +115,10 @@
         // Validasi aksi menonton iklan
         const validateResponse = await fetch('/.netlify/functions/validateAdWatch', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+          },
           body: JSON.stringify({ telegramId: user.id })
         });
 
