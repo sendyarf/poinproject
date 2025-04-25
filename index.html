@@ -61,6 +61,7 @@
     async function syncPoints(telegramId) {
       try {
         const localData = loadLocalPoints(telegramId);
+        console.log(`Sinkronisasi untuk telegramId: ${telegramId}, localPoints: ${localData.points}, messageId: ${localData.messageId}`);
         const response = await fetch('/.netlify/functions/getUserPoints', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -73,6 +74,7 @@
         const cloudPoints = data.points || 0;
         const localPoints = localData.points;
 
+        console.log(`cloudPoints: ${cloudPoints}, localPoints: ${localPoints}`);
         // Gunakan poin tertinggi
         const maxPoints = Math.max(localPoints, cloudPoints);
         if (maxPoints > localPoints) {
@@ -91,6 +93,7 @@
     // Update poin ke channel
     async function updateCloudPoints(telegramId, points, messageId) {
       try {
+        console.log(`Mengirim ke cloud: telegramId: ${telegramId}, points: ${points}, messageId: ${messageId}`);
         const response = await fetch('/.netlify/functions/updatePoints', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -100,6 +103,7 @@
         if (data.error) {
           throw new Error(data.error);
         }
+        console.log(`Cloud diperbarui: points: ${data.points}, messageId: ${data.messageId}`);
         // Simpan messageId baru ke localStorage
         saveLocalPoints(telegramId, points, data.messageId);
       } catch (error) {
@@ -124,7 +128,9 @@
 
         // Tampilkan iklan Monetag
         if (window.show_9244919) {
+          console.log('Memulai iklan Monetag');
           show_9244919().then(() => {
+            console.log('Iklan selesai');
             // Tambah poin setelah iklan selesai
             const localData = loadLocalPoints(user.id);
             const newPoints = localData.points + 1;
@@ -135,6 +141,7 @@
             document.getElementById('message').innerText = 'Gagal menampilkan iklan.';
           });
         } else {
+          console.error('Skrip Monetag belum dimuat');
           document.getElementById('message').innerText = 'Skrip iklan belum dimuat. Coba lagi.';
         }
       } catch (error) {
