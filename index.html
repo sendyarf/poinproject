@@ -45,14 +45,14 @@
 
     // Muat poin dari localStorage
     function loadLocalPoints(telegramId) {
-      const userData = JSON.parse(localStorage.getItem(`user_${telegramId}`)) || { telegramId, points: 0 };
+      const userData = JSON.parse(localStorage.getItem(`user_${telegramId}`)) || { telegramId, points: 0, messageId: null };
       document.getElementById('points-display').innerText = `Poin: ${userData.points}`;
       return userData;
     }
 
     // Simpan poin ke localStorage
-    function saveLocalPoints(telegramId, points) {
-      const userData = { telegramId, points };
+    function saveLocalPoints(telegramId, points, messageId) {
+      const userData = { telegramId, points, messageId };
       localStorage.setItem(`user_${telegramId}`, JSON.stringify(userData));
       document.getElementById('points-display').innerText = `Poin: ${points}`;
     }
@@ -60,46 +60,50 @@
     // Sinkronkan poin dari channel
     async function syncPoints(telegramId) {
       try {
+        const localData = loadLocalPoints(telegramId);
         const response = await fetch('/.netlify/functions/getUserPoints', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ telegramId })
+          body: JSON.stringify({ telegramId, messageId: localData.messageId })
         });
         const data = await response.json();
         if (data.error) {
           throw new Error(data.error);
         }
         const cloudPoints = data.points || 0;
-        const localData = loadLocalPoints(telegramId);
         const localPoints = localData.points;
 
         // Gunakan poin tertinggi
         const maxPoints = Math.max(localPoints, cloudPoints);
         if (maxPoints > localPoints) {
-          saveLocalPoints(telegramId, maxPoints);
+          saveLocalPoints(telegramId, maxPoints, localData.messageId);
         }
         if (maxPoints > cloudPoints) {
-          await updateCloudPoints(telegramId, maxPoints);
+          await updateCloudPoints(telegramId, maxPoints, localData.messageId);
         }
         document.getElementById('message').innerText = 'Poin disinkronkan!';
       } catch (error) {
+        console.error('Error saat sinkronisasi:', error);
         document.getElementById('message').innerText = `Error: ${error.message}`;
       }
     }
 
     // Update poin ke channel
-    async function updateCloudPoints(telegramId, points) {
+    async function updateCloudPoints(telegramId, points, messageId) {
       try {
         const response = await fetch('/.netlify/functions/updatePoints', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ telegramId, points })
+          body: JSON.stringify({ telegramId, points, messageId })
         });
         const data = await response.json();
         if (data.error) {
           throw new Error(data.error);
         }
+        // Simpan messageId baru ke localStorage
+        saveLocalPoints(telegramId, points, data.messageId);
       } catch (error) {
+        console.error('Error saat update cloud:', error);
         throw new Error(`Gagal menyinkronkan ke cloud: ${error.message}`);
       }
     }
@@ -124,16 +128,17 @@
             // Tambah poin setelah iklan selesai
             const localData = loadLocalPoints(user.id);
             const newPoints = localData.points + 1;
-            saveLocalPoints(user.id, newPoints);
-            updateCloudPoints(user.id, newPoints);
+            updateCloudPoints(user.id, newPoints, localData.messageId);
             document.getElementById('message').innerText = 'Iklan ditonton! +1 Poin';
           }).catch((error) => {
+            console.error('Error iklan:', error);
             document.getElementById('message').innerText = 'Gagal menampilkan iklan.';
           });
         } else {
           document.getElementById('message').innerText = 'Skrip iklan belum dimuat. Coba lagi.';
         }
       } catch (error) {
+        console.error('Error saat tonton iklan:', error);
         document.getElementById('message').innerText = `Error: ${error.message}`;
       }
     });
