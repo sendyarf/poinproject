@@ -18,6 +18,9 @@ const db = getFirestore(app);
 const auth = getAuth(app);
 const analytics = getAnalytics(app);
 
+// Export auth instance
+export { auth };
+
 export const initializeUser = async () => {
   try {
     const user = await signInAnonymously(auth);

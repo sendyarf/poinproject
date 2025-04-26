@@ -1,6 +1,12 @@
 import { useEffect, useState } from 'react';
 import { doc, updateDoc, onSnapshot } from 'firebase/firestore';
-import { db, auth } from './firebase';
+import { getFirestore, getAuth } from 'firebase/firestore';
+import { initializeApp } from 'firebase/app';
+import { getFirebaseConfig } from './firebaseConfig';
+
+const firebaseApp = initializeApp(getFirebaseConfig());
+const db = getFirestore(firebaseApp);
+const auth = getAuth(firebaseApp);
 
 const App = () => {
   const [points, setPoints] = useState(0);
