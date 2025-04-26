@@ -6,41 +6,60 @@ const App = () => {
   const [points, setPoints] = useState(0);
   const [userId, setUserId] = useState(null);
   const [adError, setAdError] = useState(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
   useEffect(() => {
     window.Telegram.WebApp.ready();
 
-    // Inisialisasi autentikasi anonim
+    // Initialize anonymous authentication
     auth.signInAnonymously().then((user) => {
       setUserId(user.user.uid);
       const userDoc = doc(db, 'users', user.user.uid);
       onSnapshot(userDoc, (doc) => {
         if (doc.exists()) setPoints(doc.data().points || 0);
       });
+    }).catch((error) => {
+      console.error('Firebase auth error:', error);
+      setAdError('Failed to initialize authentication');
     });
 
-    // Inisialisasi Monetag
+    // Initialize Monetag
     const script = document.createElement('script');
-    script.src = 'https://monetag.com/some-script.js?zone=9244919';
+    script.src = 'https://monetag.com/some-script.js?zone=9244919'; // Replace with actual Monetag script URL
     script.async = true;
     script.onload = () => {
       console.log('Monetag script loaded');
-      window.Monetag?.onAdComplete = () => {
+      window.Monetag?.onAdComplete = async () => {
         console.log('Ad completed');
-        updatePoints(userId, points + 1);
+        try {
+          await updateDoc(doc(db, 'users', userId), { points: points + 1 });
+          setPoints(points + 1);
+        } catch (error) {
+          console.error('Failed to update points:', error);
+          setAdError('Failed to update points after watching ad');
+        }
       };
     };
     script.onerror = () => {
-      setAdError('Gagal memuat skrip Monetag');
+      setAdError('Failed to load Monetag script');
     };
     document.body.appendChild(script);
 
-    return () => script.remove();
+    return () => {
+      script.remove();
+      window.Monetag?.destroy?.();
+    };
   }, [userId, points]);
 
   const updatePoints = async (userId, newPoints) => {
     if (userId) {
-      await updateDoc(doc(db, 'users', userId), { points: newPoints });
+      try {
+        await updateDoc(doc(db, 'users', userId), { points: newPoints });
+        setPoints(newPoints);
+      } catch (error) {
+        console.error('Failed to update points:', error);
+        setAdError('Failed to update points');
+      }
     }
   };
 
@@ -48,22 +67,43 @@ const App = () => {
     setAdError(null);
     try {
       window.Monetag?.showAd();
-    } catch (e) {
-      setAdError('Gagal menampilkan iklan: ' + e.message);
+    } catch (error) {
+      setAdError('Failed to show ad: ' + error.message);
+      console.error('Ad error:', error);
+    }
+  };
+
+  const MIN_WITHDRAWAL = 20000;
+
+  const handleWithdraw = () => {
+    if (points >= MIN_WITHDRAWAL) {
+      setIsModalOpen(true);
     }
   };
 
   return (
-    <div className="p-4">
-      <h1 className="text-2xl">Reward Points App</h1>
-      <p>Points: {points}</p>
-      {adError && <p className="text-red-500">{adError}</p>}
+    <div className="min-h-screen bg-gray-100 flex flex-col items-center justify-center p-4">
+      <h1 className="text-2xl font-bold mb-4">Reward Points App</h1>
+      <p className="text-lg mb-4">Your Points: {points} (IDR {points})</p>
+      {adError && <p className="text-red-500 mb-2">{adError}</p>}
       <button
         onClick={handleWatchAd}
-        className="bg-blue-500 text-white p-2 rounded"
+        className="bg-blue-500 text-white p-2 rounded mr-4"
       >
         Watch Ad
       </button>
+      <button
+        onClick={handleWithdraw}
+        className={`mt-4 px-4 py-2 rounded text-white ${
+          points >= MIN_WITHDRAWAL ? 'bg-blue-500 hover:bg-blue-600' : 'bg-gray-400 cursor-not-allowed'
+        }`}
+        disabled={points < MIN_WITHDRAWAL}
+      >
+        Request Withdrawal
+      </button>
+      {points < MIN_WITHDRAWAL && (
+        <p className="text-red-500 mt-2">Minimum withdrawal is 20,000 points.</p>
+      )}
       {/* Logika penarikan tetap sama */}
     </div>
   );

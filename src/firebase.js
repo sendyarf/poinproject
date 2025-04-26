@@ -19,47 +19,83 @@ const auth = getAuth(app);
 const analytics = getAnalytics(app);
 
 export const initializeUser = async () => {
-  const user = await signInAnonymously(auth);
-  const userDoc = doc(db, 'users', user.user.uid);
-  const docSnap = await getDoc(userDoc);
-  if (!docSnap.exists()) {
-    await setDoc(userDoc, { points: 0 });
+  try {
+    const user = await signInAnonymously(auth);
+    const userDoc = doc(db, 'users', user.user.uid);
+    const docSnap = await getDoc(userDoc);
+    if (!docSnap.exists()) {
+      await setDoc(userDoc, { points: 0 });
+    }
+    return user.user.uid;
+  } catch (error) {
+    console.error('Failed to initialize user:', error);
+    throw error;
   }
-  return user.user.uid;
 };
 
 export const getUserPoints = async (userId) => {
-  const userDoc = doc(db, 'users', userId);
-  const docSnap = await getDoc(userDoc);
-  return docSnap.exists() ? docSnap.data().points : 0;
+  try {
+    const userDoc = doc(db, 'users', userId);
+    const docSnap = await getDoc(userDoc);
+    return docSnap.exists() ? docSnap.data().points : 0;
+  } catch (error) {
+    console.error('Failed to get user points:', error);
+    throw error;
+  }
 };
 
 export const addPoints = async (userId, points) => {
-  const userDoc = doc(db, 'users', userId);
-  const docSnap = await getDoc(userDoc);
-  const currentPoints = docSnap.exists() ? docSnap.data().points : 0;
-  await updateDoc(userDoc, { points: currentPoints + points });
+  try {
+    const userDoc = doc(db, 'users', userId);
+    const docSnap = await getDoc(userDoc);
+    const currentPoints = docSnap.exists() ? docSnap.data().points : 0;
+    await updateDoc(userDoc, { points: currentPoints + points });
+    return currentPoints + points;
+  } catch (error) {
+    console.error('Failed to add points:', error);
+    throw error;
+  }
 };
 
 export const requestWithdrawal = async (userId, amount, danaNumber) => {
-  const withdrawal = {
-    userId,
-    amount,
-    danaNumber,
-    status: 'pending',
-    timestamp: new Date().toISOString()
-  };
-  await addDoc(collection(db, 'withdrawals'), withdrawal);
-  // Send to Telegram channel
-  const botToken = process.env.REACT_APP_BOT_TOKEN || '7380366315:AAH9dnuF50OpUDjGIy06bLioyEa9Fr4bfS8';
-  const channelId = '-1002697590626';
-  const message = `New Withdrawal Request:\nUser ID: ${userId}\nAmount: ${amount} IDR\nDANA Number: ${danaNumber}`;
-  await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      chat_id: channelId,
-      text: message
-    })
-  });
+  try {
+    // Validate input
+    if (!userId || !amount || !danaNumber) {
+      throw new Error('Missing required parameters');
+    }
+
+    // Validate DANA number
+    if (!/^[0-9]{10,12}$/.test(danaNumber)) {
+      throw new Error('Invalid DANA number');
+    }
+
+    // Check if user has enough points
+    const userDoc = doc(db, 'users', userId);
+    const docSnap = await getDoc(userDoc);
+    const currentPoints = docSnap.exists() ? docSnap.data().points : 0;
+    
+    if (currentPoints < amount) {
+      throw new Error('Insufficient points');
+    }
+
+    // Create withdrawal request
+    const withdrawal = {
+      userId,
+      amount,
+      danaNumber,
+      status: 'pending',
+      timestamp: new Date().toISOString()
+    };
+
+    // Add withdrawal request to database
+    const withdrawalRef = await addDoc(collection(db, 'withdrawals'), withdrawal);
+
+    // Update user points
+    await updateDoc(userDoc, { points: currentPoints - amount });
+
+    return withdrawalRef.id;
+  } catch (error) {
+    console.error('Withdrawal request failed:', error);
+    throw error;
+  }
 };
