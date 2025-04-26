@@ -31,31 +31,39 @@ const App = () => {
       console.log('Monetag script loaded');
       
       // Initialize Monetag
-      window.Monetag?.init?.();
+      if (window.Monetag && typeof window.Monetag.init === 'function') {
+        window.Monetag.init();
+      }
       
       // Set up ad complete handler
-      window.Monetag?.onAdComplete = async () => {
-        console.log('Ad completed');
-        try {
-          await updateDoc(doc(db, 'users', userId), { points: points + 1 });
-          setPoints(points + 1);
-          setAdError(null);
-        } catch (error) {
-          console.error('Failed to update points:', error);
-          setAdError('Failed to update points after watching ad');
-        }
-      };
+      if (window.Monetag && typeof window.Monetag.onAdComplete === 'function') {
+        window.Monetag.onAdComplete = async () => {
+          console.log('Ad completed');
+          try {
+            await updateDoc(doc(db, 'users', userId), { points: points + 1 });
+            setPoints(points + 1);
+            setAdError(null);
+          } catch (error) {
+            console.error('Failed to update points:', error);
+            setAdError('Failed to update points after watching ad');
+          }
+        };
+      }
 
       // Set up ad error handler
-      window.Monetag?.onError = (error) => {
-        console.error('Monetag error:', error);
-        setAdError('Failed to load ad. Please try again.');
-      };
+      if (window.Monetag && typeof window.Monetag.onError === 'function') {
+        window.Monetag.onError = (error) => {
+          console.error('Monetag error:', error);
+          setAdError('Failed to load ad. Please try again.');
+        };
+      }
 
       // Set up ad close handler
-      window.Monetag?.onAdClose = () => {
-        console.log('Ad closed');
-      };
+      if (window.Monetag && typeof window.Monetag.onAdClose === 'function') {
+        window.Monetag.onAdClose = () => {
+          console.log('Ad closed');
+        };
+      }
     };
 
     script.onerror = () => {
@@ -66,7 +74,9 @@ const App = () => {
 
     return () => {
       script.remove();
-      window.Monetag?.destroy?.();
+      if (window.Monetag && typeof window.Monetag.destroy === 'function') {
+        window.Monetag.destroy();
+      }
     };
   }, [userId, points]);
 
@@ -86,12 +96,16 @@ const App = () => {
     setAdError(null);
     try {
       // Initialize ad if not already initialized
-      if (!window.Monetag?.isInitialized?.()) {
-        window.Monetag?.init?.();
+      if (window.Monetag && typeof window.Monetag.isInitialized === 'function' && !window.Monetag.isInitialized()) {
+        if (typeof window.Monetag.init === 'function') {
+          window.Monetag.init();
+        }
       }
       
       // Show ad
-      window.Monetag?.showAd?.();
+      if (window.Monetag && typeof window.Monetag.showAd === 'function') {
+        window.Monetag.showAd();
+      }
     } catch (error) {
       console.error('Ad error:', error);
       setAdError('Failed to show ad. Please try again.');
