@@ -29,19 +29,38 @@ const App = () => {
     script.async = true;
     script.onload = () => {
       console.log('Monetag script loaded');
+      
+      // Initialize Monetag
+      window.Monetag?.init?.();
+      
+      // Set up ad complete handler
       window.Monetag?.onAdComplete = async () => {
         console.log('Ad completed');
         try {
           await updateDoc(doc(db, 'users', userId), { points: points + 1 });
           setPoints(points + 1);
+          setAdError(null);
         } catch (error) {
           console.error('Failed to update points:', error);
           setAdError('Failed to update points after watching ad');
         }
       };
+
+      // Set up ad error handler
+      window.Monetag?.onError = (error) => {
+        console.error('Monetag error:', error);
+        setAdError('Failed to load ad. Please try again.');
+      };
+
+      // Set up ad close handler
+      window.Monetag?.onAdClose = () => {
+        console.log('Ad closed');
+      };
     };
+
     script.onerror = () => {
-      setAdError('Failed to load Monetag script');
+      console.error('Failed to load Monetag script');
+      setAdError('Failed to load Monetag script. Please try again.');
     };
     document.body.appendChild(script);
 
@@ -66,10 +85,16 @@ const App = () => {
   const handleWatchAd = () => {
     setAdError(null);
     try {
-      window.Monetag?.showAd();
+      // Initialize ad if not already initialized
+      if (!window.Monetag?.isInitialized?.()) {
+        window.Monetag?.init?.();
+      }
+      
+      // Show ad
+      window.Monetag?.showAd?.();
     } catch (error) {
-      setAdError('Failed to show ad: ' + error.message);
       console.error('Ad error:', error);
+      setAdError('Failed to show ad. Please try again.');
     }
   };
 
